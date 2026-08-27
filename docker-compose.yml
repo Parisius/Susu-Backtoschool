@@ -1,0 +1,22 @@
+name: susu-backend
+services:
+  api:
+    build: .
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    depends_on:
+      - mongo
+    restart: unless-stopped
+
+  mongo:
+    image: mongo:7
+    volumes:
+      - mongo-data:/data/db
+    restart: unless-stopped
+    # No "ports:" here on purpose — Mongo only needs to be reachable by the
+    # api container over the internal compose network, never from outside.
+
+volumes:
+  mongo-data:
