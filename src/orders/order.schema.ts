@@ -32,6 +32,12 @@ export class Order {
   @Prop({ default: 'en_attente' }) paymentStatus: string;
   @Prop() paydunyaToken: string;
   @Prop({ required: true }) date: string;
+
+  // Not collected by the simplified order form anymore — filled in later
+  // by staff from the orders panel. All optional on purpose.
+  @Prop({ default: '' }) city: string;
+  @Prop({ default: '' }) address: string;
+  @Prop({ default: '' }) source: string;
 }
 
 export const OrderSchema = SchemaFactory.createForClass(Order);

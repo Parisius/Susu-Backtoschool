@@ -18,10 +18,14 @@ async function bootstrap() {
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle('SùSù API')
-    .setDescription('Commandes et paiements PayDunya pour le site SùSù')
+    .setDescription('Commandes, paiements PayDunya et gestion de l\'équipe pour le site SùSù')
     .setVersion('1.0')
     .addTag('orders', 'Commandes')
     .addTag('payments', 'Paiements PayDunya')
+    .addTag('auth', 'Connexion et mot de passe')
+    .addTag('users', "Gestion de l'équipe")
+    .addTag('logs', "Journal d'activité")
+    .addBearerAuth()
     .build();
   const document = SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup('api-docs', app, document);

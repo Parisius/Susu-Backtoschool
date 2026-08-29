@@ -45,4 +45,28 @@ export class OrdersService {
   async findAll(): Promise<OrderDocument[]> {
     return this.orderModel.find().sort({ createdAt: -1 }).exec();
   }
+
+  // --- Added for the backoffice orders panel ---
+  // Only applies the fields actually present in `updates` — an omitted
+  // field (undefined) is left untouched rather than overwritten, so the
+  // controller can send a partial payload depending on the caller's role
+  // (e.g. marketing sends city/address/source but never status).
+  async update(id: string, updates: Partial<Order>): Promise<OrderDocument> {
+    const set: Record<string, any> = {};
+    if (updates.status !== undefined) set.status = updates.status;
+    if (updates.city !== undefined) set.city = updates.city;
+    if (updates.address !== undefined) set.address = updates.address;
+    if (updates.source !== undefined) set.source = updates.source;
+
+    const order = await this.orderModel
+      .findByIdAndUpdate(id, set, { new: true })
+      .exec();
+    if (!order) throw new NotFoundException('Commande introuvable.');
+    return order;
+  }
+
+  async remove(id: string): Promise<void> {
+    const res = await this.orderModel.findByIdAndDelete(id).exec();
+    if (!res) throw new NotFoundException('Commande introuvable.');
+  }
 }
