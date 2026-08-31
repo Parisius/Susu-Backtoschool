@@ -11,10 +11,12 @@ services:
     restart: unless-stopped
 
   mongo:
-    image: mongo:7
-    volumes:
-      - mongo-data:/data/db
-    restart: unless-stopped
+  image: mongo:7
+  ports:
+    - "127.0.0.1:27017:27017"
+  volumes:
+    - mongo-data:/data/db
+  restart: unless-stopped
     # No "ports:" here on purpose — Mongo only needs to be reachable by the
     # api container over the internal compose network, never from outside.
 
