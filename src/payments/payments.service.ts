@@ -94,6 +94,7 @@ export class PaymentsService {
     const status = data.status || data.invoice?.status || 'unknown';
     const orderRef = data.custom_data?.orderRef || null;
 
+    let order: any = null;
     if (orderRef) {
       const newStatus =
         status === 'completed'
@@ -101,13 +102,31 @@ export class PaymentsService {
           : status === 'cancelled' || status === 'failed'
           ? 'annule'
           : 'nouveau';
-      await this.ordersService.updateByRef(orderRef, {
+      order = await this.ordersService.updateByRef(orderRef, {
         paymentStatus: status,
         status: newStatus,
       });
     }
 
-    return { status, orderRef, amount: data.invoice?.total_amount || null };
+    return {
+      status,
+      orderRef,
+      amount: data.invoice?.total_amount || null,
+      // Included so successpay.js can send the confirmation email only
+      // once payment is actually confirmed, without a second (auth'd)
+      // call to fetch order details it otherwise has no access to.
+      order: order
+        ? {
+            ref: order.ref,
+            name: order.name,
+            phone: order.phone,
+            email: order.email,
+            items: order.items,
+            total: order.total,
+            date: order.date,
+          }
+        : null,
+    };
   }
 
   // --- Reconciliation: catches payments no browser ever came back to
