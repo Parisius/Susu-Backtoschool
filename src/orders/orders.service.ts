@@ -69,4 +69,21 @@ export class OrdersService {
     const res = await this.orderModel.findByIdAndDelete(id).exec();
     if (!res) throw new NotFoundException('Commande introuvable.');
   }
+
+  // --- Added for the PayDunya reconciliation cron (see payments.service.ts) ---
+  // Orders that started an online payment (have a paydunyaToken) and are
+  // still marked 'en_attente', old enough that PayDunya's own checkout
+  // session (30 min, per their own countdown UI) has had time to resolve
+  // one way or another. Re-checking anything younger than that just wastes
+  // API calls on payments that are still legitimately in progress.
+  async findStalePendingPayments(olderThanMs: number): Promise<OrderDocument[]> {
+    const cutoff = new Date(Date.now() - olderThanMs);
+    return this.orderModel
+      .find({
+        paymentStatus: 'en_attente',
+        paydunyaToken: { $exists: true, $ne: null },
+        createdAt: { $lte: cutoff },
+      })
+      .exec();
+  }
 }

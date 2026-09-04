@@ -1,8 +1,11 @@
-import { BadGatewayException, Injectable } from '@nestjs/common';
+import { BadGatewayException, Injectable, Logger } from '@nestjs/common';
+import { Cron } from '@nestjs/schedule';
 import { OrdersService } from '../orders/orders.service';
 
 @Injectable()
 export class PaymentsService {
+  private readonly logger = new Logger(PaymentsService.name);
+
   // PAYDUNYA_BASE_URL must be the sandbox host while using test_ keys, and
   // the production host once you switch to live_ keys — PayDunya rejects a
   // key/host mismatch outright (this is the "LIVE Private Key and Token
@@ -13,6 +16,15 @@ export class PaymentsService {
     process.env.PUBLIC_BASE_URL || 'http://localhost:3000';
   private readonly storeName =
     process.env.PAYDUNYA_STORE_NAME || 'SùSù — DIXTRI Textile';
+
+  // Re-check pending payments no sooner than this — PayDunya's own
+  // checkout page shows a 30 min session countdown, so anything younger
+  // is very likely still legitimately in progress.
+  private readonly RECHECK_AFTER_MS = 15 * 60 * 1000;
+  // Past this age, stop asking PayDunya and mark it dead ourselves —
+  // otherwise a truly abandoned checkout (customer closed the tab, no
+  // IPN ever fires because nothing ever happened) sits as "pending" forever.
+  private readonly GIVE_UP_AFTER_MS = 60 * 60 * 1000;
 
   constructor(private readonly ordersService: OrdersService) {}
 
@@ -96,5 +108,46 @@ export class PaymentsService {
     }
 
     return { status, orderRef, amount: data.invoice?.total_amount || null };
+  }
+
+  // --- Reconciliation: catches payments no browser ever came back to
+  // confirm, and no IPN ever reported (e.g. the customer just closed the
+  // tab mid-checkout). Runs every 10 minutes. Requires ScheduleModule.forRoot()
+  // to be imported once in AppModule for @Cron to actually fire — see setup
+  // note below.
+  @Cron('*/10 * * * *')
+  async reconcilePendingPayments() {
+    const stale = await this.ordersService.findStalePendingPayments(this.RECHECK_AFTER_MS);
+    if (stale.length === 0) return;
+
+    this.logger.log(`Réconciliation PayDunya : ${stale.length} commande(s) en attente à revérifier.`);
+
+    for (const order of stale) {
+      let stillUnresolved = true;
+      try {
+        const result = await this.confirmInvoice(order.paydunyaToken);
+        // confirmInvoice() already wrote the real outcome to the order if
+        // PayDunya reported one — nothing more to do for this order.
+        if (result.status !== 'en_attente' && result.status !== 'pending' && result.status !== 'unknown') {
+          stillUnresolved = false;
+        }
+      } catch (err) {
+        this.logger.warn(`Échec vérification PayDunya pour ${order.ref} : ${err.message}`);
+        // Treat an unreachable/invalid check the same as "still unresolved"
+        // — fall through to the age check below rather than looping forever
+        // on a token PayDunya no longer recognizes.
+      }
+
+      if (!stillUnresolved) continue;
+
+      const ageMs = Date.now() - (order as any).createdAt.getTime();
+      if (ageMs > this.GIVE_UP_AFTER_MS) {
+        await this.ordersService.updateByRef(order.ref, {
+          paymentStatus: 'expire',
+          status: 'annule',
+        });
+        this.logger.log(`${order.ref} marquée paiement expiré après ${Math.round(ageMs / 60000)} min sans résolution.`);
+      }
+    }
   }
 }
