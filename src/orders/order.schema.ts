@@ -31,6 +31,10 @@ export class Order {
   @Prop({ default: 'nouveau' }) status: string;
   @Prop({ default: 'en_attente' }) paymentStatus: string;
   @Prop() paydunyaToken: string;
+  // 'cod' (Payer à la livraison) or 'online' (Payer maintenant) — set once
+  // by the customer at checkout (see commande.js) and never changed
+  // automatically afterwards, regardless of what happens with PayDunya.
+  @Prop({ type: String, enum: ['cod', 'online'], default: 'online' }) paymentMode: string;
   @Prop({ required: true }) date: string;
 
   // Not collected by the simplified order form anymore — filled in later

@@ -3,6 +3,7 @@ import { Type } from 'class-transformer';
 import {
   IsArray,
   IsEmail,
+  IsIn,
   IsNumber,
   IsOptional,
   IsString,
@@ -58,4 +59,15 @@ export class CreateOrderDto {
   @ApiProperty({ example: 7500 })
   @IsNumber()
   total: number;
+
+  @ApiProperty({
+    example: 'online',
+    enum: ['cod', 'online'],
+    required: false,
+    description:
+      "Mode de paiement choisi par le client — 'cod' (Payer à la livraison) ou 'online' (Payer maintenant). Défaut : 'online'.",
+  })
+  @IsOptional()
+  @IsIn(['cod', 'online'])
+  paymentMode?: string;
 }
