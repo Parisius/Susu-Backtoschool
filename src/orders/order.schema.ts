@@ -35,6 +35,13 @@ export class Order {
   // by the customer at checkout (see commande.js) and never changed
   // automatically afterwards, regardless of what happens with PayDunya.
   @Prop({ type: String, enum: ['cod', 'online'], default: 'online' }) paymentMode: string;
+  // Populated only when paymentStatus becomes 'failed' or 'cancelled' AND
+  // PayDunya actually supplied a reason. Per PayDunya's own docs this is
+  // only reliably filled in for card-payment failures/cancellations — for
+  // mobile money (the common case here), PayDunya generally reports just
+  // the bare status with no detail, so this stays '' in that case. See
+  // payments.service.ts#confirmInvoice.
+  @Prop({ default: '' }) paymentFailReason: string;
   @Prop({ required: true }) date: string;
 
   // Not collected by the simplified order form anymore — filled in later

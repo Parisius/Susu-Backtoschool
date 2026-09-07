@@ -94,6 +94,18 @@ export class PaymentsService {
     const status = data.status || data.invoice?.status || 'unknown';
     const orderRef = data.custom_data?.orderRef || null;
 
+    // Only meaningful for a failed/cancelled transaction, and even then
+    // PayDunya's own docs say `fail_reason` / `errors` are reliably filled
+    // in only for card-payment failures — mobile money (the common case
+    // for us) usually comes back with just the bare status and nothing
+    // here, so this ends up '' in that case rather than something like
+    // "solde insuffisant". See:
+    // https://developers.paydunya.com/doc/FR/http_json#section-4
+    const failReason =
+      status === 'failed' || status === 'cancelled'
+        ? data.fail_reason || data.errors?.message || data.errors?.description || ''
+        : '';
+
     let order: any = null;
     if (orderRef) {
       const newStatus =
@@ -105,6 +117,13 @@ export class PaymentsService {
       order = await this.ordersService.updateByRef(orderRef, {
         paymentStatus: status,
         status: newStatus,
+        // Write paymentFailReason when we actually have one to store, and
+        // also clear out any stale reason from an earlier failed attempt
+        // once the payment succeeds. Otherwise (e.g. still pending) leave
+        // whatever was there untouched.
+        ...(failReason || status === 'completed'
+          ? { paymentFailReason: failReason }
+          : {}),
       });
     }
 
@@ -112,6 +131,8 @@ export class PaymentsService {
       status,
       orderRef,
       amount: data.invoice?.total_amount || null,
+      // '' becomes null so successpay.js can do a simple truthy check.
+      failReason: failReason || null,
       // Included so successpay.js can send the confirmation email only
       // once payment is actually confirmed, without a second (auth'd)
       // call to fetch order details it otherwise has no access to.
